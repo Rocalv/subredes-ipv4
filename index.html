@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Subredes</title>
+    <style>
+        :root {
+            --net-color: #3498db;
+            --host-color: #2ecc71;
+            --bg: #f4f7f6;
+            --card: #fff;
+            --text: #333;
+            --muted: #7f8c8d;
+            --dark: #2c3e50;
+            --danger: #e74c3c;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: var(--card);
+            padding: clamp(16px, 4vw, 30px);
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 820px;
+            height: fit-content;
+        }
+
+        h2 {
+            text-align: center;
+            color: var(--dark);
+            margin-top: 0;
+            font-size: clamp(1.1em, 3vw, 1.5em);
+        }
+
+        /* ── Controls ── */
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .input-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.88em;
+        }
+
+        input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+            width: 100%;
+        }
+
+        /* Máscara: dos campos */
+        .mask-wrapper {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .mask-wrapper input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+            flex: 1;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+
+        .mask-wrapper input:first-of-type {
+            flex: 1 1 220px;
+            min-width: 140px;
+        }
+
+        .mask-wrapper input:last-of-type {
+            flex: 0 0 72px;
+            min-width: 56px;
+            text-align: center;
+        }
+
+        .mask-sep {
+            font-weight: bold;
+            color: var(--muted);
+            font-size: 1.1em;
+            flex-shrink: 0;
+        }
+
+        .pattern-network {
+            color: var(--net-color);
+            font-weight: 700;
+        }
+
+        .pattern-host {
+            color: var(--host-color);
+            font-weight: 700;
+        }
+
+        /* Slider con counter */
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 5px;
+        }
+
+        .slider-counter {
+            font-size: 1em;
+            font-weight: bold;
+            color: var(--danger);
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--danger);
+        }
+
+        /* ── Results block ── */
+        .results-block {
+            background: var(--dark);
+            color: white;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .results-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            padding: 10px 16px;
+            font-size: clamp(0.85em, 2.2vw, 1.1em);
+            gap: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .results-row:last-child { border-bottom: none; }
+
+        .results-row.active-row {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .results-label {
+            font-size: 0.78em;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            opacity: 0.7;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .results-value {
+            font-family: monospace;
+            font-size: 1.15em;
+            letter-spacing: 1px;
+            word-break: break-all;
+            text-align: right;
+        }
+
+        /* ── Toggle ── */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            background: #ecf0f1;
+            padding: 12px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+
+        .toggle-label {
+            font-weight: bold;
+            color: var(--muted);
+            transition: color 0.3s;
+            font-size: clamp(0.75em, 2vw, 0.9em);
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .toggle-label.active-red       { color: var(--net-color); }
+        .toggle-label.active-broadcast { color: var(--host-color); }
+
+        .toggle-hint {
+            font-size: 0.72em;
+            color: var(--muted);
+            text-align: center;
+            margin-top: -18px;
+            margin-bottom: 18px;
+            font-style: italic;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 56px;
+            height: 30px;
+            flex-shrink: 0;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider-sw {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: var(--net-color);
+            transition: .4s;
+            border-radius: 30px;
+        }
+
+        .slider-sw:before {
+            position: absolute;
+            content: "";
+            height: 22px; width: 22px;
+            left: 4px; bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider-sw               { background-color: var(--host-color); }
+        input:checked + .slider-sw:before        { transform: translateX(26px); }
+
+        /* ── Octets ── */
+        .octets-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: clamp(8px, 1.2vw, 16px);
+            margin-bottom: 20px;
+            row-gap: 16px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .octet {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            width: 100%;
+            min-width: 0;
+            padding: 10px 14px;
+            box-sizing: border-box;
+            background: rgba(0,0,0,0.02);
+            border-radius: 8px;
+            gap: 16px;
+        }
+
+        .octet-bits-area {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .octet-title {
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            color: var(--dark);
+            font-size: clamp(0.9em, 1.6vw, 1em);
+        }
+
+        .bits-row, .weight-row {
+            display: flex;
+            gap: clamp(4px, 1vw, 8px);
+            justify-content: flex-start;
+            align-items: center;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 2px;
+        }
+
+        .weight-row {
+            margin-top: 4px;
+            padding-left: 0;
+        }
+
+        .bit {
+            width: clamp(28px, 4.2vw, 40px);
+            height: clamp(28px, 4.2vw, 40px);
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 6px;
+            font-family: monospace;
+            font-weight: 700;
+            font-size: clamp(0.85em, 2vw, 1.1em);
+            color: #fff;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        .weight {
+            width: clamp(28px, 4.2vw, 40px);
+            text-align: center;
+            font-size: clamp(0.45em, 1.2vw, 0.62em);
+            color: var(--muted);
+            flex-shrink: 0;
+        }
+
+        .bit.network { background-color: var(--net-color); }
+        .bit.host    { background-color: var(--host-color); }
+
+        /* Suma del octeto */
+        .octet-sum {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 54px;
+            background: var(--dark);
+            color: white;
+            border-radius: 8px;
+            padding: 8px 10px;
+            flex-shrink: 0;
+        }
+
+        .octet-sum-label {
+            font-size: 0.6em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            opacity: 0.6;
+            margin-bottom: 2px;
+        }
+
+        .octet-sum-value {
+            font-family: monospace;
+            font-size: 1.3em;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        /* ── Validation hint ── */
+        .hint {
+            font-size: 0.78em;
+            color: var(--danger);
+            margin-top: 3px;
+            min-height: 1em;
+        }
+
+        @media (max-width: 480px) {
+            .controls {
+                grid-template-columns: 1fr;
+            }
+            .input-group.full-width {
+                grid-column: 1;
+            }
+            .octets-container {
+                flex-direction: column;
+            }
+            .octet {
+                flex: 1 1 100%;
+                width: 100%;
+            }
+            .bits-row {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Subredes IPv4</h2>
+
+    <div class="controls">
+
+        <div class="input-group">
+            <label>Dirección IP:</label>
+            <input type="text" id="ipInput" value="" placeholder="ej. 192.168.1.0">
+            <span class="hint" id="ipHint"></span>
+            <div id="classInfo" style="margin-top:6px; font-size:0.82em; color:var(--muted); min-height:1.2em;"></div>
+        </div>
+
+        <div class="input-group">
+            <label>Máscara:</label>
+            <div class="mask-wrapper">
+                  <input type="text" id="decimalMaskInput" value="" placeholder="255.x.x.x"
+                       title="Máscara decimal: ej. 255.255.254.0">
+                  <span class="mask-sep">·</span>
+                  <input type="text" id="cidrInput" value="" placeholder="/24"
+                       title="Notación CIDR: número entre 8 y 30">
+            </div>
+            <span class="hint" id="maskHint"></span>
+        </div>
+
+        <div class="input-group full-width" id="subnetSliderGroup" style="display:none">
+            <div class="slider-header">
+                <label style="margin:0">Seleccionar Subred:</label>
+                <span class="slider-counter" id="subnetCounter">0 / 0</span>
+            </div>
+            <input type="range" id="subnetSlider" value="0" min="0" max="0">
+        </div>
+
+    </div>
+
+    <!-- Bloque de resultados siempre visible -->
+    <div class="results-block">
+        <div class="results-row" id="rowRed">
+            <span class="results-label">Dirección de Red</span>
+            <span class="results-value" id="ipRed">—</span>
+        </div>
+        <div class="results-row" id="rowBroadcast">
+            <span class="results-label">Dirección de Broadcast</span>
+            <span class="results-value" id="ipBroadcast">—</span>
+        </div>
+        <div class="results-row" id="rowRango">
+            <span class="results-label">Rango válido</span>
+            <span class="results-value" id="ipRango">—</span>
+        </div>      
+    </div>
+
+    <!-- Toggle: solo cambia qué octetos se visualizan -->
+    <div class="toggle-container">
+        <span id="labelRed" class="toggle-label active-red">Dirección de Red</span>
+        <label class="switch">
+            <input type="checkbox" id="broadcastToggle">
+            <span class="slider-sw"></span>
+        </label>
+        <span id="labelBroadcast" class="toggle-label">Dirección de Broadcast</span>
+    </div>
+
+    <div class="octets-container" id="visualizer"></div>
+
+</div>
+
+
+<script>
+    let isBroadcastMode = false;
+    let updatingMask = false;
+    const weights = [128, 64, 32, 16, 8, 4, 2, 1];
+
+    // --- FUNCIONES UTILITARIAS ---
+
+    function ipToBinaryString(ip) {
+        const octets = ip.split('.');
+        if (octets.length !== 4) return "00000000000000000000000000000000";
+        return octets.map(octet => {
+            const num = parseInt(octet, 10);
+            return (isNaN(num) ? 0 : num).toString(2).padStart(8, '0');
+        }).join('');
+    }
+
+    function binaryToIp(bin) {
+        let parts = [];
+        for (let i = 0; i < 4; i++) parts.push(parseInt(bin.substring(i*8, (i+1)*8), 2));
+        return parts.join('.');
+    }
+
+    function getDefaultCidr(ip) {
+        const firstOctet = parseInt(ip.split('.')[0], 10);
+        if (isNaN(firstOctet)) return 24;
+        if (firstOctet <= 126) return 8;
+        if (firstOctet <= 191) return 16;
+        return 24;
+    }
+
+    function cidrToDecimal(cidr) {
+        const bin = "1".repeat(cidr) + "0".repeat(32 - cidr);
+        return [
+            parseInt(bin.substring(0, 8), 2),
+            parseInt(bin.substring(8, 16), 2),
+            parseInt(bin.substring(16, 24), 2),
+            parseInt(bin.substring(24, 32), 2)
+        ].join('.');
+    }
+
+    function decimalToCidr(dec) {
+        const binStr = ipToBinaryString(dec);
+        return binStr.indexOf('0') !== -1 ? binStr.indexOf('0') : 32;
+    }
+
+    function colorClassPattern(pattern) {
+        return pattern.split('').map(char => {
+            if (char === 'N') return `<span class="pattern-network">${char}</span>`;
+            if (char === 'H') return `<span class="pattern-host">${char}</span>`;
+            return char;
+        }).join('');
+    }
+
+    function getClassInfo(ip) {
+        const firstOctet = parseInt(ip.split('.')[0], 10);
+        if (isNaN(firstOctet) || ip.split('.').length < 2) return null;
+        if (firstOctet <= 126)  return { clase: 'A', patron: 'N.H.H.H', defaultMask: '255.0.0.0',     cidr: 8  };
+        if (firstOctet === 127) return { clase: '— (Loopback)', patron: '—', defaultMask: '255.0.0.0', cidr: 8  };
+        if (firstOctet <= 191)  return { clase: 'B', patron: 'N.N.H.H', defaultMask: '255.255.0.0',   cidr: 16 };
+        if (firstOctet <= 223)  return { clase: 'C', patron: 'N.N.N.H', defaultMask: '255.255.255.0', cidr: 24 };
+        if (firstOctet <= 239)  return { clase: 'D (Multicast)', patron: '—', defaultMask: '—',        cidr: null };
+        return                         { clase: 'E (Reservada)',  patron: '—', defaultMask: '—',        cidr: null };
+    }
+
+    // --- LÓGICA PRINCIPAL ---
+
+    function updateVisualizer(sourceEvent = 'init') {
+        const ipInput = document.getElementById('ipInput');
+        const cidrInput = document.getElementById('cidrInput');
+        const slider = document.getElementById('subnetSlider');
+        const broadcastToggle = document.getElementById('broadcastToggle');
+        const sliderGroup = document.getElementById('subnetSliderGroup');
+
+        isBroadcastMode = broadcastToggle ? broadcastToggle.checked : false;
+
+        let ipStr = ipInput.value.trim();
+        let cidr = parseInt(cidrInput.value.replace(/^\//, ''), 10) || 24;
+
+        // 1. Clase y CIDR por defecto
+        const defaultCidr = getDefaultCidr(ipStr);
+        const borrowedBits = Math.max(0, cidr - defaultCidr);
+        const maxSubnets = borrowedBits > 0 ? Math.pow(2, borrowedBits) - 1 : 0;
+
+        // Info de clase
+        const classInfo = getClassInfo(ipStr);
+        const classInfoEl = document.getElementById('classInfo');
+        if (classInfoEl) {
+            if (classInfo && classInfo.cidr) {
+                classInfoEl.innerHTML = `Clase: <strong>${classInfo.clase}</strong> (${colorClassPattern(classInfo.patron)})<br>Máscara por defecto: <strong>${classInfo.defaultMask}</strong> /${classInfo.cidr}`;
+            } else if (classInfo) {
+                classInfoEl.innerHTML = `Clase <strong>${classInfo.clase}</strong>`;
+            } else {
+                classInfoEl.textContent = '';
+            }
+        }
+
+        // Slider
+        if (sliderGroup) sliderGroup.style.display = borrowedBits > 0 ? '' : 'none';
+        slider.max = maxSubnets;
+
+        // 2. IP a binario
+        let currentBinaryIp = ipToBinaryString(ipStr);
+        let networkPart = currentBinaryIp.substring(0, defaultCidr);
+
+        let realSubnetIndex = 0;
+        if (sourceEvent === 'slider') {
+            realSubnetIndex = parseInt(slider.value, 10);
+        } else {
+            let realSubnetBits = currentBinaryIp.substring(defaultCidr, cidr);
+            realSubnetIndex = borrowedBits > 0 ? (parseInt(realSubnetBits, 2) || 0) : 0;
+            slider.value = realSubnetIndex;
+        }
+
+        const counter = document.getElementById('subnetCounter');
+        if (counter) counter.textContent = realSubnetIndex + ' / ' + maxSubnets;
+
+        // 3. Construir parte de subred
+        let subnetPart = "";
+        if (borrowedBits > 0) {
+            subnetPart = realSubnetIndex.toString(2).padStart(borrowedBits, '0');
+        }
+
+        const hostBitsCount = 32 - cidr;
+
+        // IP de red (hosts en 0)
+        const networkBinary = networkPart + subnetPart + '0'.repeat(hostBitsCount);
+        // IP de broadcast (hosts en 1)
+        const broadcastBinary = networkPart + subnetPart + '1'.repeat(hostBitsCount);
+
+        const networkIp    = binaryToIp(networkBinary);
+        const broadcastIp  = binaryToIp(broadcastBinary);
+
+        // Rango válido
+        let rangoText = '—';
+        if (hostBitsCount > 1) {
+            // primera usable = red + 1, última = broadcast - 1
+            const netNum = parseInt(networkBinary, 2);
+            const bcNum  = parseInt(broadcastBinary, 2);
+            const firstUsable = binaryToIp((netNum + 1).toString(2).padStart(32, '0'));
+            const lastUsable  = binaryToIp((bcNum  - 1).toString(2).padStart(32, '0'));
+            rangoText = firstUsable + ' — ' + lastUsable;
+        } else {
+            rangoText = 'Sin hosts utilizables';
+        }
+
+        // Actualizar bloque de resultados
+        document.getElementById('ipRed').textContent       = networkIp;
+        document.getElementById('ipBroadcast').textContent = broadcastIp;
+        document.getElementById('ipRango').textContent     = rangoText;
+
+        // Destacar la fila activa según el toggle
+        document.getElementById('rowRed').classList.toggle('active-row', !isBroadcastMode);
+        document.getElementById('rowBroadcast').classList.toggle('active-row', isBroadcastMode);
+
+        // Labels del toggle
+        const labelRed = document.getElementById('labelRed');
+        const labelBc  = document.getElementById('labelBroadcast');
+        if (!isBroadcastMode) {
+            labelRed.className = 'toggle-label active-red';
+            labelBc.className  = 'toggle-label';
+        } else {
+            labelRed.className = 'toggle-label';
+            labelBc.className  = 'toggle-label active-broadcast';
+        }
+
+        // 4. Actualizar ipInput solo cuando viene del slider
+        if (sourceEvent === 'slider') {
+            ipInput.value = networkIp;
+        }
+
+        // 5. Renderizar octetos según el modo (red o broadcast)
+        const displayBinary = isBroadcastMode ? broadcastBinary : networkBinary;
+        renderBits(displayBinary, cidr);
+    }
+
+    function renderBits(fullBinary, cidr) {
+        const visualizer = document.getElementById('visualizer');
+        if (!visualizer) return;
+        visualizer.innerHTML = '';
+
+        for (let i = 0; i < 4; i++) {
+            const octetBin = fullBinary.substring(i * 8, (i + 1) * 8);
+            const octetVal = parseInt(octetBin, 2);
+
+            const octetDiv = document.createElement('div');
+            octetDiv.className = 'octet';
+
+            // Área de bits y pesos
+            const bitsArea = document.createElement('div');
+            bitsArea.className = 'octet-bits-area';
+
+            const title = document.createElement('div');
+            title.className = 'octet-title';
+            title.textContent = 'Octeto ' + (i + 1);
+            bitsArea.appendChild(title);
+
+            const bitsRow = document.createElement('div');
+            bitsRow.className = 'bits-row';
+
+            const weightsRow = document.createElement('div');
+            weightsRow.className = 'weight-row';
+
+            for (let j = 0; j < 8; j++) {
+                const globalIndex = (i * 8) + j;
+                const bitVal = octetBin[j];
+
+                const bitDiv = document.createElement('div');
+                bitDiv.className = `bit ${globalIndex < cidr ? 'network' : 'host'}`;
+                bitDiv.textContent = bitVal;
+                bitsRow.appendChild(bitDiv);
+
+                const weightDiv = document.createElement('div');
+                weightDiv.className = 'weight';
+                weightDiv.textContent = weights[j];
+                weightsRow.appendChild(weightDiv);
+            }
+
+            bitsArea.appendChild(bitsRow);
+            bitsArea.appendChild(weightsRow);
+            octetDiv.appendChild(bitsArea);
+
+            // Caja de suma decimal
+            const sumBox = document.createElement('div');
+            sumBox.className = 'octet-sum';
+            const sumLabel = document.createElement('div');
+            sumLabel.className = 'octet-sum-label';
+            // sumLabel.textContent = 'Suma';
+            const sumValue = document.createElement('div');
+            sumValue.className = 'octet-sum-value';
+            sumValue.textContent = octetVal;
+            sumBox.appendChild(sumLabel);
+            sumBox.appendChild(sumValue);
+            octetDiv.appendChild(sumBox);
+
+            visualizer.appendChild(octetDiv);
+        }
+    }
+
+    // --- EVENT LISTENERS ---
+
+    document.getElementById('ipInput').addEventListener('input', function () {
+        const ipStr = this.value.trim();
+        const decEl = document.getElementById('decimalMaskInput');
+        const cidrEl = document.getElementById('cidrInput');
+
+        if (ipStr && decEl && cidrEl) {
+            const def = getDefaultCidr(ipStr);
+            if (def) {
+                updatingMask = true;
+                cidrEl.value = '/' + def;
+                decEl.value = cidrToDecimal(def);
+                updatingMask = false;
+            }
+        }
+        updateVisualizer('ip');
+    });
+
+    document.getElementById('cidrInput').addEventListener('input', function() {
+        if (updatingMask) return;
+        updatingMask = true;
+        const decEl = document.getElementById('decimalMaskInput');
+        let cidrVal = parseInt(this.value.replace(/^\//, ''), 10);
+        if (cidrVal >= 0 && cidrVal <= 32 && decEl) {
+            decEl.value = cidrToDecimal(cidrVal);
+        }
+        updatingMask = false;
+        updateVisualizer('cidr');
+    });
+
+    const decInput = document.getElementById('decimalMaskInput');
+    if (decInput) {
+        decInput.addEventListener('input', function() {
+            if (updatingMask) return;
+            updatingMask = true;
+            const cidrEl = document.getElementById('cidrInput');
+            let cidrVal = decimalToCidr(this.value.trim());
+            if (cidrVal > 0 && cidrVal <= 32 && cidrEl) {
+                cidrEl.value = '/' + cidrVal;
+            }
+            updatingMask = false;
+            updateVisualizer('decimal');
+        });
+    }
+
+    document.getElementById('subnetSlider').addEventListener('input', function() {
+        updateVisualizer('slider');
+    });
+
+    document.getElementById('broadcastToggle').addEventListener('change', function() {
+        updateVisualizer('toggle');
+    });
+
+    window.onload = () => updateVisualizer('init');
+</script>
+
+</body>
+</html>

@@ -716,17 +716,45 @@
         updateVisualizer('ip');
     });
 
-    document.getElementById('cidrInput').addEventListener('input', function() {
-        if (updatingMask) return;
-        updatingMask = true;
-        const decEl = document.getElementById('decimalMaskInput');
-        let cidrVal = parseInt(this.value.replace(/^\//, ''), 10);
-        if (cidrVal >= 0 && cidrVal <= 32 && decEl) {
-            decEl.value = cidrToDecimal(cidrVal);
-        }
-        updatingMask = false;
-        updateVisualizer('cidr');
-    });
+    const cidrInput = document.getElementById('cidrInput');
+    if (cidrInput) {
+        cidrInput.addEventListener('input', function() {
+            if (updatingMask) return;
+            updatingMask = true;
+            const rawValue = this.value.replace(/[^0-9]/g, '');
+            this.value = rawValue ? '/' + rawValue : '/';
+
+            const decEl = document.getElementById('decimalMaskInput');
+            const cidrVal = parseInt(rawValue, 10);
+            if (cidrVal >= 0 && cidrVal <= 32 && decEl) {
+                decEl.value = cidrToDecimal(cidrVal);
+            }
+            updatingMask = false;
+            updateVisualizer('cidr');
+        });
+
+        cidrInput.addEventListener('keydown', function(e) {
+            if ((e.key === 'Backspace' || e.key === 'Delete') && this.selectionStart <= 1) {
+                e.preventDefault();
+                this.setSelectionRange(1, 1);
+            }
+        });
+
+        cidrInput.addEventListener('focus', function() {
+            if (!this.value) {
+                this.value = '/';
+            }
+            if (this.selectionStart < 1) {
+                this.setSelectionRange(1, 1);
+            }
+        });
+
+        cidrInput.addEventListener('click', function() {
+            if (this.selectionStart < 1) {
+                this.setSelectionRange(1, 1);
+            }
+        });
+    }
 
     const decInput = document.getElementById('decimalMaskInput');
     if (decInput) {

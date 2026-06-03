@@ -879,33 +879,79 @@
         });
     }
 
+    let decMaskTimer = null;
     const decInput = document.getElementById('decimalMaskInput');
     if (decInput) {
         decInput.addEventListener('input', function() {
             if (updatingMask) return;
 
-            const raw = this.value.trim();
-            const cidrEl = document.getElementById('cidrInput');
+            const inputEl = this;
+            const raw = inputEl.value.trim();
             const maskHintEl = document.getElementById('maskHint');
 
-            if (!raw) {
-                clearFieldError(this, maskHintEl);
-                return;
-            }
+            // Limpiar error visual mientras escribe
+            clearFieldError(inputEl, maskHintEl);
 
-            // Máscara inválida (bits no contiguos o IP malformada): solo advertir, no calcular
+            if (!raw) return;
+
+            // Debounce: esperar 600ms sin escribir antes de validar
+            clearTimeout(decMaskTimer);
+            decMaskTimer = setTimeout(function() {
+                if (updatingMask) return;
+
+                const cidrEl = document.getElementById('cidrInput');
+                const currentRaw = inputEl.value.trim();
+
+                if (!currentRaw) return;
+
+                // Máscara inválida: mostrar error, no calcular
+                if (!isValidDecimalMask(currentRaw)) {
+                    setFieldError(inputEl, maskHintEl, `⚠ "${currentRaw}" no es una máscara válida. Ej: 255.255.255.0`);
+                    return;
+                }
+
+                clearFieldError(inputEl, maskHintEl);
+
+                const cidrVal = decimalToCidr(currentRaw);
+
+                // Máscara válida pero excede /30: autocorregir
+                if (cidrVal > MAX_CIDR) {
+                    showToast(`⚠ La máscara equivale a /${cidrVal} y supera el máximo /${MAX_CIDR}. Se ajusta automáticamente.`);
+                    updatingMask = true;
+                    inputEl.value = cidrToDecimal(MAX_CIDR);
+                    cidrEl.value = '/' + MAX_CIDR;
+                    updatingMask = false;
+                } else {
+                    updatingMask = true;
+                    cidrEl.value = '/' + cidrVal;
+                    updatingMask = false;
+                }
+
+                updateVisualizer('decimal');
+            }, 600);
+        });
+
+        // Al perder el foco, validar inmediatamente sin esperar debounce
+        decInput.addEventListener('blur', function() {
+            clearTimeout(decMaskTimer);
+            if (updatingMask) return;
+
+            const cidrEl = document.getElementById('cidrInput');
+            const maskHintEl = document.getElementById('maskHint');
+            const raw = this.value.trim();
+
+            if (!raw) return;
+
             if (!isValidDecimalMask(raw)) {
                 setFieldError(this, maskHintEl, `⚠ "${raw}" no es una máscara válida. Ej: 255.255.255.0`);
                 return;
             }
 
             clearFieldError(this, maskHintEl);
-
             const cidrVal = decimalToCidr(raw);
 
-            // Máscara válida pero excede /30: autocorregir como hace el CIDR
             if (cidrVal > MAX_CIDR) {
-                showToast(`⚠ La máscara "${raw}" equivale a /${cidrVal} y supera el máximo /${MAX_CIDR}. Se ajusta automáticamente.`);
+                showToast(`⚠ La máscara equivale a /${cidrVal} y supera el máximo /${MAX_CIDR}. Se ajusta automáticamente.`);
                 updatingMask = true;
                 this.value = cidrToDecimal(MAX_CIDR);
                 cidrEl.value = '/' + MAX_CIDR;

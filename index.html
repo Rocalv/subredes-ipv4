@@ -422,6 +422,25 @@
                 -webkit-overflow-scrolling: touch;
             }
         }
+
+        .subnet-number {
+            width: 72px;
+            padding: 2px 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+            font-weight: bold;
+            text-align: center;
+            color: var(--danger);
+            background: transparent;
+            -moz-appearance: textfield;
+        }
+        .subnet-number::-webkit-outer-spin-button,
+        .subnet-number::-webkit-inner-spin-button {
+            opacity: 1;
+            cursor: pointer;
+        }
+
     </style>
 </head>
 <body>
@@ -455,9 +474,19 @@
         </div>
 
         <div id="subnetSliderGroup" style="display:none">
+            <!--
             <div class="slider-header">
                 <label style="margin:0">Seleccionar Subred:</label>
                 <span class="slider-counter" id="subnetCounter">0 / 0</span>
+            </div>
+            -->
+            <div class="slider-header">
+                <label style="margin:0">Seleccionar Subred:</label>
+                <span class="slider-counter">
+                    <input type="number" id="subnetNumber" class="subnet-number"
+                        value="0" min="0" max="0" step="1">
+                    <span id="subnetTotal">&nbsp;/ 0</span>
+                </span>
             </div>
             <input type="range" id="subnetSlider" value="0" min="0" max="0">
         </div>
@@ -679,7 +708,16 @@
 
         const counter = document.getElementById('subnetCounter');
         // Subred 0 … n-1 (nomenclatura de cátedra)
-        if (counter) counter.textContent = 'Subred ' + realSubnetIndex + ' / ' + (numSubnets > 0 ? numSubnets - 1 : 0);
+        // if (counter) counter.textContent = 'Subred ' + realSubnetIndex + ' / ' + (numSubnets > 0 ? numSubnets - 1 : 0);
+        const numInput = document.getElementById('subnetNumber');
+        const totalSpan = document.getElementById('subnetTotal');
+        const maxIdx = numSubnets > 0 ? numSubnets - 1 : 0;
+        if (numInput) {
+            numInput.max = maxIdx;
+            if (sourceEvent !== 'number') numInput.value = realSubnetIndex;
+        }
+        if (totalSpan) totalSpan.textContent = ' / ' + maxIdx;
+
 
         // 3. Construir parte de subred
         let subnetPart = "";
@@ -967,8 +1005,23 @@
     }
 
     document.getElementById('subnetSlider').addEventListener('input', function() {
+        const numInput = document.getElementById('subnetNumber');
+        if (numInput) numInput.value = this.value;
         updateVisualizer('slider');
     });
+
+    const numInput = document.getElementById('subnetNumber');
+    if (numInput) {
+        numInput.addEventListener('input', function() {
+            const slider = document.getElementById('subnetSlider');
+            let value = parseInt(this.value, 10);
+            if (isNaN(value)) value = 0;
+            value = Math.max(0, Math.min(value, parseInt(slider.max, 10)));
+            slider.value = value;
+            this.value = value;
+            updateVisualizer('slider');
+        });
+    }
 
     document.getElementById('broadcastToggle').addEventListener('change', function() {
         updateVisualizer('toggle');
